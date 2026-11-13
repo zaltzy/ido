@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Only the two owners may read or write. Replace the addresses below.
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['OWNER_1_EMAIL', 'OWNER_2_EMAIL'];
+    }
+    match /{document=**} {
+      allow read, write: if isOwner();
+    }
+  }
+}
