@@ -188,7 +188,14 @@ textarea{resize:vertical;min-height:90px}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 /* Firebase web config (not a secret; access is enforced by firestore.rules). */
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDtLSEJgQQE1ucx33nKFnyFDoJQilDpB4E",
+  authDomain: "appartment-dashboard-176cb.firebaseapp.com",
+  projectId: "appartment-dashboard-176cb",
+  storageBucket: "appartment-dashboard-176cb.firebasestorage.app",
+  messagingSenderId: "968190462022",
+  appId: "1:968190462022:web:2e0fad1360929c1c33e247"
+};
 (function(){
 "use strict";
 document.documentElement.dir="rtl"; document.documentElement.lang="he";
@@ -200,7 +207,7 @@ const SOURCES={phone:"טלפון",whatsapp:"וואטסאפ",yad2:"יד2",messeng
 const STATUSES={new:"חדשה",contacted:"בקשר",viewing:"נקבע ביקור",visited:"ביקרו בדירה",nego:"משא ומתן",closed:"לא רלוונטי"};
 const STATUS_PILL={new:"bad",contacted:"",viewing:"acc",visited:"acc",nego:"ok",closed:""};
 
-const S={ready:false,error:"",stale:false,config:{},channels:[],leads:[],tab:"today",me:"",leadFilter:"open",canWrite:true};
+const S={feedToken:"",ready:false,error:"",stale:false,config:{},channels:[],leads:[],tab:"today",me:"",leadFilter:"open",canWrite:true};
 try{S.me=localStorage.getItem("me")||"";S.tab=localStorage.getItem("tab")||"today"}catch(e){}
 let db=null;
 
@@ -335,7 +342,10 @@ function vSettings(){
     <label class="f">מייל<input id="s_be" type="email" dir="ltr" value="${v(b.email)}"></label>
   </div>
   <div class="hint">מיילי התזכורת נשלחים בבוקר (07:00) ובערב (21:30), לא בשבת, לכתובות שרשומות כאן.</div>
-  <div><button class="btn pri">שמור הגדרות</button></div></form>`;
+  <div><button class="btn pri">שמור הגדרות</button></div>
+  <h2>חיבור למיילי התזכורת</h2>
+  <label class="f">קוד חיבור (מעבירים ל-Claude פעם אחת, לא משתפים עם אף אחד אחר)<input id="s_token" readonly dir="ltr" value="${v(S.feedToken)}"></label>
+  <div><button type="button" class="btn sm" data-copy="${v(S.feedToken)}">העתק קוד</button></div></form>`;
 }
 
 /* ---------- actions ---------- */
@@ -482,9 +492,32 @@ function subscribe(){
     S.config=s.exists?JSON.parse(JSON.stringify(s.data())):{};
     if(!autoMe&&s.exists){autoMe=true;let saved=null;try{saved=localStorage.getItem("me")}catch(e){}
       if(saved===null){const p=S.config.people||{};for(const k of ["a","b"]) if(p[k]&&p[k].email&&p[k].email.toLowerCase()===userEmail.toLowerCase()) S.me=k}}
-    ok(s);render()},fail);
-  db.collection("channels").onSnapshot(s=>{S.channels=s.docs.map(x=>({...x.data(),id:x.id}));ok(s);render()},fail);
-  db.collection("leads").onSnapshot(s=>{S.leads=s.docs.map(x=>({...x.data(),id:x.id}));ok(s);render()},fail);
+    ok(s);render();publishFeed()},fail);
+  db.collection("channels").onSnapshot(s=>{S.channels=s.docs.map(x=>({...x.data(),id:x.id}));ok(s);render();publishFeed()},fail);
+  db.collection("leads").onSnapshot(s=>{S.leads=s.docs.map(x=>({...x.data(),id:x.id}));ok(s);if(!s.metadata.fromCache)leadsLive=true;render();publishFeed()},fail);
+  /* Reminder feed: a snapshot of the data under an unguessable id, read by the scheduled email runs. */
+  db.doc("private/feed").onSnapshot(async s=>{
+    if(s.metadata.fromCache)return;
+    if(!s.exists){ if(!tokenMade){tokenMade=true;const a=new Uint8Array(24);crypto.getRandomValues(a);try{await db.doc("private/feed").set({token:Array.from(a,x=>x.toString(16).padStart(2,"0")).join("")})}catch(e){}} return }
+    const t=s.data().token; if(!t||t===S.feedToken)return; S.feedToken=t;
+    try{const f=await db.doc("feed/"+t).get(); if(f.exists) lastFeed=f.data().payload||""}catch(e){}
+    feedReady=true; publishFeed(); render();
+    db.collection("inbox/"+t+"/items").onSnapshot(q=>{ q.docs.forEach(async d=>{
+      const it=d.data(), dup=leadsLive&&S.leads.some(l=>l.id===d.id||(it.gmailThreadId&&l.gmailThreadId===it.gmailThreadId));
+      if(!leadsLive)return;
+      try{ if(!dup) await db.doc("leads/"+d.id).set({name:String(it.name||"פנייה מיד2").slice(0,120),phone:String(it.phone||"").slice(0,40),source:"yad2",status:"new",owner:"",nextFollowUp:"",viewingAt:"",notes:String(it.notes||"").slice(0,2000),createdAt:String(it.createdAt||new Date().toISOString()).slice(0,40),lastContact:"",log:[],gmailThreadId:String(it.gmailThreadId||"").slice(0,80)});
+        await d.ref.delete() }catch(e){} }) },()=>{});
+  },()=>{});
+}
+let feedReady=false, lastFeed="", feedTimer=null, tokenMade=false, leadsLive=false;
+function publishFeed(){
+  if(!feedReady||!S.feedToken||!S.ready||S.stale)return;
+  clearTimeout(feedTimer);
+  feedTimer=setTimeout(()=>{
+    const payload=JSON.stringify({config:S.config,channels:S.channels,leads:S.leads});
+    if(payload===lastFeed)return; lastFeed=payload;
+    db.doc("feed/"+S.feedToken).set({updatedAt:new Date().toISOString(),payload}).catch(()=>{lastFeed=""});
+  },3000);
 }
 function start(){
   render();

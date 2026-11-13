@@ -10,5 +10,15 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if isOwner();
     }
+    // Reminder feed: readable only by exact document id (an unguessable token), never listable.
+    match /feed/{token} {
+      allow get: if true;
+    }
+    // New leads found in email are dropped here under the same token; the dashboard moves them into leads.
+    match /inbox/{token}/items/{id} {
+      allow create: if exists(/databases/$(database)/documents/feed/$(token))
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'notes', 'createdAt', 'gmailThreadId'])
+        && request.resource.data.size() <= 5;
+    }
   }
 }
