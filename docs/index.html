@@ -108,6 +108,11 @@ textarea{resize:vertical;min-height:90px}
 #gate .card{max-width:380px;text-align:center;align-items:center}
 #gate h2{font-family:var(--display);font-weight:400;font-size:1.4rem;color:var(--fg)}
 .userbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.dot.msgcheck{background:var(--fb)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.pgrid figure{margin:0;position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--sunken)}
+.pgrid img{width:100%;height:100%;object-fit:cover;display:block}
+.pgrid button{position:absolute;inset-inline-end:4px;top:4px}
 </style>
 </head>
 <body>
@@ -139,6 +144,7 @@ textarea{resize:vertical;min-height:90px}
     <label class="f">באחריות<select id="l_owner"></select></label>
     <label class="f">לחזור אליו בתאריך<input id="l_follow" type="date"></label>
     <label class="f">ביקור בדירה<input id="l_viewing" type="datetime-local"></label>
+    <label class="f">קישור לשיחה (מסנג'ר, אינסטגרם)<input id="l_link" type="url" dir="ltr" placeholder="https://"></label>
   </div>
   <label class="f">הערות (תקציב, מה חשוב להם, מה נאמר)<textarea id="l_notes"></textarea></label>
   <div class="dlgacts"><div><button type="button" class="btn danger" id="l_del">מחק</button></div>
@@ -177,7 +183,8 @@ textarea{resize:vertical;min-height:90px}
   <div class="hint" id="postHint"></div>
   <label class="f">הטקסט לפרסום (אפשר לשנות לפני ההעתקה)<textarea id="p_text" style="min-height:180px"></textarea></label>
   <div class="chips"><button type="button" class="btn" id="p_copy">העתק טקסט</button><a class="btn" id="p_open" target="_blank" rel="noopener">פתח את המקום לפרסום</a></div>
-  <div class="dlgacts"><div></div><div><button type="button" class="btn" data-close>עוד לא</button><button class="btn pri">פרסמתי, סמן כבוצע</button></div></div>
+  <div class="chips" id="p_photoRow"><span class="hint" id="p_photoInfo"></span><button type="button" class="btn sm" id="p_share" hidden>שתף תמונות</button><button type="button" class="btn sm" id="p_dl" hidden>הורד תמונות</button></div>
+  <div class="dlgacts"><div><button type="button" class="btn" id="p_skip" hidden>דלג לבא</button></div><div><button type="button" class="btn" data-close>עוד לא</button><button class="btn pri">פרסמתי, סמן כבוצע</button></div></div>
 </form></dialog>
 
 <div id="toast" hidden></div>
@@ -202,7 +209,7 @@ document.documentElement.dir="rtl"; document.documentElement.lang="he";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-const PLATFORMS={yad2:{label:"יד2",days:1,verb:"להקפיץ"},fbgroup:{label:"קבוצת פייסבוק",days:2,verb:"לפרסם"},fbprofile:{label:"פרופיל פייסבוק",days:3,verb:"לפרסם"},igstory:{label:"סטורי באינסטגרם",days:2,verb:"להעלות"},igpost:{label:"פוסט באינסטגרם",days:7,verb:"להעלות"}};
+const PLATFORMS={yad2:{label:"יד2",days:1,verb:"להקפיץ"},fbgroup:{label:"קבוצת פייסבוק",days:2,verb:"לפרסם"},fbprofile:{label:"פרופיל פייסבוק",days:3,verb:"לפרסם"},igstory:{label:"סטורי באינסטגרם",days:2,verb:"להעלות"},igpost:{label:"פוסט באינסטגרם",days:7,verb:"להעלות"},msgcheck:{label:"בדיקת הודעות",days:1,verb:"לבדוק"}};
 const SOURCES={phone:"טלפון",whatsapp:"וואטסאפ",yad2:"יד2",messenger:"מסנג'ר",instagram:"אינסטגרם",other:"אחר"};
 const STATUSES={new:"חדשה",contacted:"בקשר",viewing:"נקבע ביקור",visited:"ביקרו בדירה",nego:"משא ומתן",closed:"לא רלוונטי"};
 const STATUS_PILL={new:"bad",contacted:"",viewing:"acc",visited:"acc",nego:"ok",closed:""};
@@ -257,6 +264,7 @@ function render(){
   if(!S.canWrite) h+=`<div class="banner">אין לך הרשאת עריכה, אפשר רק לצפות. בקשו מבעל הדשבורד לשתף אתכם כעורכים.</div>`;
   h+=({today:vToday,posts:vPosts,leads:vLeads,settings:vSettings}[S.tab]||vToday)(d);
   $("app").innerHTML=h;
+  if(S.tab==="settings"&&db)loadPhotos().then(renderPhotos).catch(()=>{});
 }
 
 function postRow(c){
@@ -276,7 +284,7 @@ function leadRow(l,compact){
   return `<div class="row"><div class="main"><div class="ttl">${esc(l.name||"ללא שם")} <span class="pill ${STATUS_PILL[st]||""}">${STATUSES[st]||st}</span></div>
   <div class="meta">${l.phone?`<span class="phone">${esc(l.phone)}</span> · `:""}${esc(SOURCES[l.source]||"")} · <span class="who">${esc(whoLabel(l.owner))}</span>${extra.length?"<br>"+extra.join(" · "):""}</div>
   ${!compact&&l.notes?`<div class="note">${esc(l.notes)}</div>`:""}</div>
-  <div class="acts">${wa?`<a class="btn sm" href="${wa}" target="_blank" rel="noopener">וואטסאפ</a>`:""}${l.phone?`<button class="btn sm" data-copy="${esc(l.phone)}">העתק מספר</button>`:""}<button class="btn pri sm" data-talk="${esc(l.id)}">דיברנו</button><button class="btn sm" data-editlead="${esc(l.id)}">ערוך</button></div></div>`;
+  <div class="acts">${/^https?:\/\//i.test(l.link||"")?`<a class="btn sm" href="${esc(l.link)}" target="_blank" rel="noopener">פתח שיחה</a>`:""}${wa?`<a class="btn sm" href="${wa}" target="_blank" rel="noopener">וואטסאפ</a>`:""}${l.phone?`<button class="btn sm" data-copy="${esc(l.phone)}">העתק מספר</button>`:""}<button class="btn pri sm" data-talk="${esc(l.id)}">דיברנו</button><button class="btn sm" data-editlead="${esc(l.id)}">ערוך</button></div></div>`;
 }
 function waitText(iso){if(!iso)return"";const h=Math.floor((Date.now()-new Date(iso).getTime())/36e5);if(h<1)return"פחות משעה";if(h<24)return h+" שעות";const d=Math.floor(h/24);return d===1?"יום":d+" ימים"}
 function waLink(p){let n=String(p).replace(/[^\d]/g,"");if(n.startsWith("0"))n="972"+n.slice(1);if(n.length<9)return"";const msg=(S.config.replyText||"").trim();return "https://wa.me/"+n+(msg?"?text="+encodeURIComponent(msg):"")}
@@ -290,7 +298,7 @@ function vToday(d){
     <div class="stat"><b>${view.length}</b><span>ביקורים השבוע</span></div></div>`;
   if(!S.ready) return h+`<div class="list"><div class="empty">טוען…</div></div>`;
   h+=`<div class="sechead"><h2>פניות שמחכות למענה</h2><button class="btn pri sm" data-newlead>פנייה חדשה</button></div><div class="list">${fresh.length?fresh.map(l=>leadRow(l,true)).join(""):`<div class="empty">אין פניות פתוחות בלי מענה. כשמישהו מתקשר או כותב, הוסיפו אותו כאן מיד.</div>`}</div>`;
-  h+=`<div class="sechead"><h2>לפרסם מחדש היום</h2></div><div class="list">${posts.length?posts.map(postRow).join(""):`<div class="empty">${S.channels.length?"כל הפרסומים מעודכנים.":"עוד לא הוגדרו פרסומים. הוסיפו את המודעה ביד2 ואת קבוצות הפייסבוק בלשונית פרסומים."}</div>`}</div>`;
+  h+=`<div class="sechead"><h2>לפרסם מחדש היום</h2>${posts.length>1?`<button class="btn pri sm" data-round>סבב פרסום (${posts.length})</button>`:""}</div><div class="list">${posts.length?posts.map(postRow).join(""):`<div class="empty">${S.channels.length?"כל הפרסומים מעודכנים.":"עוד לא הוגדרו פרסומים. הוסיפו את המודעה ביד2 ואת קבוצות הפייסבוק בלשונית פרסומים."}</div>`}</div>`;
   h+=`<div class="sechead"><h2>לחזור למתעניינים</h2></div><div class="list">${follow.length?follow.map(l=>leadRow(l,true)).join(""):`<div class="empty">אין מעקבים להיום.</div>`}</div>`;
   h+=`<div class="sechead"><h2>ביקורים קרובים</h2></div><div class="list">${view.length?view.map(l=>leadRow(l,true)).join(""):`<div class="empty">אין ביקורים מתוכננים בשבוע הקרוב.</div>`}</div>`;
   return h;
@@ -332,6 +340,8 @@ function vSettings(){
   <h2>טקסטים</h2>
   <label class="f">טקסט המודעה (לפייסבוק ולפוסטים)<textarea id="s_ad" style="min-height:170px">${v(S.config.adText)}</textarea></label>
   <div><button type="button" class="btn sm" id="s_gen">נסח טיוטה מפרטי הדירה</button></div>
+  <label class="f">נוסח שני (מתחלף בין הקבוצות כדי שפייסבוק לא תסמן כספאם)<textarea id="s_ad2">${v(S.config.adText2)}</textarea></label>
+  <label class="f">נוסח שלישי<textarea id="s_ad3">${v(S.config.adText3)}</textarea></label>
   <label class="f">טקסט קצר לסטורי<textarea id="s_story">${v(S.config.storyText)}</textarea></label>
   <label class="f">הודעת מענה ראשונה בוואטסאפ<textarea id="s_reply">${v(S.config.replyText)}</textarea></label>
   <h2>מי מקבל תזכורות במייל</h2>
@@ -340,9 +350,15 @@ function vSettings(){
     <label class="f">מייל<input id="s_ae" type="email" dir="ltr" value="${v(a.email)}"></label>
     <label class="f">שם<input id="s_bn" value="${v(b.name||"גלית")}"></label>
     <label class="f">מייל<input id="s_be" type="email" dir="ltr" value="${v(b.email)}"></label>
+    <label class="f">שם המשתמש של ${v(a.name||"עידו")} בפייסבוק (לקישור מסנג'ר)<input id="s_am" dir="ltr" value="${v(a.messenger)}"></label>
+    <label class="f">שם המשתמש של ${v(b.name||"גלית")} בפייסבוק<input id="s_bm" dir="ltr" value="${v(b.messenger)}"></label>
   </div>
   <div class="hint">מיילי התזכורת נשלחים בבוקר (07:00) ובערב (21:30), לא בשבת, לכתובות שרשומות כאן.</div>
   <div><button class="btn pri">שמור הגדרות</button></div>
+  <h2>תמונות הדירה</h2>
+  <div class="hint" id="photoCount">טוען תמונות…</div>
+  <div class="pgrid" id="photoGrid"></div>
+  <label class="f">הוספת תמונות (עד 12, מוקטנות אוטומטית)<input id="s_photos" type="file" accept="image/*" multiple></label>
   <h2>חיבור למיילי התזכורת</h2>
   <label class="f">קוד חיבור (מעבירים ל-Claude פעם אחת, לא משתפים עם אף אחד אחר)<input id="s_token" readonly dir="ltr" value="${v(S.feedToken)}"></label>
   <div><button type="button" class="btn sm" data-copy="${v(S.feedToken)}">העתק קוד</button></div></form>`;
@@ -366,7 +382,7 @@ function openLead(id){
   $("leadTitle").textContent=l?"עריכת פנייה":"פנייה חדשה";
   $("l_name").value=l?.name||"";$("l_phone").value=l?.phone||"";
   $("l_source").innerHTML=opts(SOURCES,l?.source||"phone");$("l_status").innerHTML=opts(STATUSES,l?.status||"new");
-  $("l_owner").innerHTML=ownerOpts(l?l.owner:S.me);$("l_follow").value=l?.nextFollowUp||"";$("l_viewing").value=l?.viewingAt||"";$("l_notes").value=l?.notes||"";
+  $("l_owner").innerHTML=ownerOpts(l?l.owner:S.me);$("l_follow").value=l?.nextFollowUp||"";$("l_viewing").value=l?.viewingAt||"";$("l_link").value=l?.link||"";$("l_notes").value=l?.notes||"";
   $("l_del").hidden=!l;$("l_del").textContent="מחק";$("dlgLead").showModal();
 }
 function openTalk(id){
@@ -383,17 +399,69 @@ function openChan(id){
   $("c_last").value=c?.lastPosted||"";$("c_text").value=c?.text||"";$("c_notes").value=c?.notes||"";
   $("c_del").hidden=!c;$("c_del").textContent="מחק";$("dlgChan").showModal();
 }
+let round=[], roundTotal=0, photos=null, photoFiles=[];
+function adVariant(c){
+  const v=[S.config.adText,S.config.adText2,S.config.adText3].map(x=>(x||"").trim()).filter(Boolean);
+  if(!v.length)return"";
+  const groups=S.channels.filter(x=>x.platform===c.platform).map(x=>x.id).sort();
+  return v[((Number(c.count)||0)+Math.max(0,groups.indexOf(c.id)))%v.length];
+}
 function openPost(id){
   const c=S.channels.find(x=>x.id===id);if(!c)return;editing=c;
-  const p=PLATFORMS[c.platform]||PLATFORMS.fbgroup;
-  $("postTitle").textContent=p.verb+": "+c.name;
-  let text=c.text||(c.platform==="igstory"?(S.config.storyText||S.config.adText):S.config.adText)||"";
-  $("postHint").textContent=c.platform==="yad2"?"היכנסו לאזור האישי ביד2 ולחצו על הקפצת המודעה. אחר כך סמנו כאן כבוצע.":(text?"העתיקו את הטקסט, פתחו את הקישור, הדביקו וצרפו תמונות.":"עוד לא נכתב טקסט מודעה. אפשר לכתוב אותו בלשונית הגדרות.")+(c.notes?" הערה: "+c.notes:"");
-  $("p_text").value=text;$("p_text").parentElement.hidden=c.platform==="yad2";$("p_copy").hidden=c.platform==="yad2";
+  const p=PLATFORMS[c.platform]||PLATFORMS.fbgroup, noText=c.platform==="yad2"||c.platform==="msgcheck";
+  const step=roundTotal?" ("+(roundTotal-round.length)+" מתוך "+roundTotal+")":"";
+  $("postTitle").textContent=p.verb+": "+c.name+step;
+  const text=noText?"":(c.text||(c.platform==="igstory"?(S.config.storyText||adVariant(c)):adVariant(c))||"");
+  $("postHint").textContent=(c.platform==="yad2"?"היכנסו לאזור האישי ביד2 ולחצו על הקפצת המודעה. אחר כך סמנו כאן כבוצע."
+    :c.platform==="msgcheck"?"פתחו את תיבת ההודעות ובדקו גם את \"בקשות הודעה\", ששם מסתתרות פניות מאנשים שאינם חברים. כל פנייה חדשה הוסיפו בלשונית פניות."
+    :text?"הטקסט הועתק. פתחו את הקישור, הדביקו וצרפו תמונות.":"עוד לא נכתב טקסט מודעה. אפשר לכתוב אותו בלשונית הגדרות.")+(c.notes?" הערה: "+c.notes:"");
+  $("p_text").value=text;$("p_text").parentElement.hidden=noText;$("p_copy").hidden=noText;
   const url=c.url||(c.platform==="yad2"?(S.config.apartment||{}).yad2Url:"");
   const a=$("p_open");a.hidden=!/^https?:\/\//i.test(url||"");if(!a.hidden)a.href=url;
-  $("dlgPost").showModal();
+  $("p_skip").hidden=!round.length;
+  $("p_photoRow").hidden=noText;$("p_share").hidden=true;$("p_dl").hidden=true;$("p_photoInfo").textContent="";
+  if(!noText&&db) loadPhotos().then(async ph=>{
+    if(!ph.length){$("p_photoInfo").textContent="עוד לא הועלו תמונות (לשונית הגדרות).";return}
+    if(photoFiles.length!==ph.length){photoFiles=await Promise.all(ph.map(async(x,n)=>new File([await (await fetch(x.data)).blob()],"apartment-"+(n+1)+".jpg",{type:"image/jpeg"})))}
+    $("p_photoInfo").textContent=ph.length+" תמונות:";
+    $("p_share").hidden=!(navigator.canShare&&navigator.canShare({files:photoFiles}));$("p_dl").hidden=false;
+  }).catch(()=>{});
+  if(!$("dlgPost").open)$("dlgPost").showModal();
+  if(text&&navigator.clipboard) navigator.clipboard.writeText(text).then(()=>toast("הטקסט הועתק, אפשר להדביק"),()=>{});
 }
+function startRound(){
+  const ids=derive().posts.filter(c=>mine(c.owner)).map(c=>c.id); if(!ids.length)return;
+  round=ids;roundTotal=ids.length;openPost(round.shift());
+}
+function nextInRound(){ if(round.length)openPost(round.shift()); else{roundTotal=0;if($("dlgPost").open)$("dlgPost").close()} }
+async function loadPhotos(force){
+  if(photos&&!force)return photos;
+  const q=await db.collection("photos").get();
+  photos=q.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>(a.createdAt||"")<(b.createdAt||"")?-1:1);photoFiles=[];
+  return photos;
+}
+function renderPhotos(){
+  const g=$("photoGrid");if(!g||!photos)return;
+  g.innerHTML=photos.map(x=>`<figure><img src="${esc(x.data)}" alt="תמונה של הדירה"><button type="button" class="btn sm" data-delphoto="${esc(x.id)}">מחק</button></figure>`).join("");
+  $("photoCount").textContent=photos.length?photos.length+" תמונות שמורות.":"עוד לא הועלו תמונות.";
+}
+function resizeImage(file){ return new Promise((res,rej)=>{
+  const img=new Image(),u=URL.createObjectURL(file);
+  img.onload=()=>{const k=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement("canvas");
+    c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);
+    let q=.82,d=c.toDataURL("image/jpeg",q);while(d.length>900000&&q>.35){q-=.1;d=c.toDataURL("image/jpeg",q)}
+    d.length>1000000?rej():res(d)};
+  img.onerror=()=>{URL.revokeObjectURL(u);rej()};img.src=u}) }
+document.addEventListener("change",async e=>{
+  if(e.target.id!=="s_photos"||!db)return;
+  const files=Array.from(e.target.files||[]);e.target.value="";
+  const room=12-(photos?photos.length:0); if(files.length>room){toast("אפשר לשמור עד 12 תמונות");files.length=Math.max(0,room)}
+  let ok=0,bad=0;
+  for(const f of files){ toast("מעלה תמונה "+(ok+bad+1)+" מתוך "+files.length+"…");
+    try{const d=await resizeImage(f);await db.collection("photos").add({data:d,createdAt:new Date().toISOString()});ok++}catch(err){bad++} }
+  await loadPhotos(true).catch(()=>{});renderPhotos();
+  if(files.length)toast(bad?ok+" תמונות נשמרו, "+bad+" נכשלו":ok+" תמונות נשמרו");
+});
 function genAd(){
   const g=id=>$(id).value.trim();
   const lines=["למכירה"+(g("s_rooms")?": דירת "+g("s_rooms")+" חדרים":"")+(g("s_address")?" ב"+g("s_address"):"")];
@@ -403,13 +471,14 @@ function genAd(){
   if(g("s_price"))lines.push("מחיר מבוקש: "+Number(g("s_price").replace(/[^\d]/g,"")).toLocaleString("he-IL")+" ₪");
   lines.push("ללא תיווך. לפרטים ולתיאום ביקור שלחו הודעה.");
   if(g("s_yad2"))lines.push("תמונות ופרטים נוספים: "+g("s_yad2"));
+  const mu=(S.me==="b"?g("s_bm"):g("s_am"))||g("s_am")||g("s_bm"); if(mu)lines.push("אפשר לכתוב לי במסנג'ר: https://m.me/"+mu.replace(/^@/,""));
   return lines.join("\n");
 }
 
 document.addEventListener("click",e=>{
   const t=e.target.closest("button,a");if(!t)return;
   const ds=t.dataset;
-  if("close" in ds){t.closest("dialog").close();return}
+  if("close" in ds){round=[];roundTotal=0;t.closest("dialog").close();return}
   if("me" in ds){S.me=ds.me;try{localStorage.setItem("me",S.me)}catch(e){}render();return}
   if(ds.tab){S.tab=ds.tab;try{localStorage.setItem("tab",S.tab)}catch(e){}$("app").innerHTML="";render();return}
   if(ds.lf){S.leadFilter=ds.lf;render();return}
@@ -418,7 +487,12 @@ document.addEventListener("click",e=>{
   if(ds.talk)return openTalk(ds.talk);
   if("newchan" in ds)return openChan();
   if(ds.editchan)return openChan(ds.editchan);
-  if(ds.post)return openPost(ds.post);
+  if("round" in ds)return startRound();
+  if(ds.post){round=[];roundTotal=0;return openPost(ds.post)}
+  if(t.id==="p_skip")return nextInRound();
+  if(t.id==="p_share"){navigator.share({files:photoFiles}).catch(()=>{});return}
+  if(t.id==="p_dl"){(photos||[]).forEach((x,n)=>{const a=document.createElement("a");a.href=x.data;a.download="apartment-"+(n+1)+".jpg";document.body.appendChild(a);a.click();a.remove()});return}
+  if(ds.delphoto){ if(ds.armed){const id=ds.delphoto;write(()=>db.doc("photos/"+id).delete(),"התמונה נמחקה").then(()=>loadPhotos(true)).then(renderPhotos).catch(()=>{})} else{ds.armed="1";t.textContent="למחוק?"} return }
   if(ds.copy)return copyText(ds.copy);
   if(t.id==="p_copy")return copyText($("p_text").value,$("p_text"));
   if(t.id==="s_gen"){$("s_ad").value=genAd();return}
@@ -430,7 +504,7 @@ $("c_platform").addEventListener("change",e=>{if(!editing)$("c_interval").value=
 document.addEventListener("submit",async e=>{
   e.preventDefault();const f=e.target;
   if(f.id==="fLead"){
-    const data={name:$("l_name").value.trim(),phone:$("l_phone").value.trim(),source:$("l_source").value,status:$("l_status").value,owner:$("l_owner").value,nextFollowUp:$("l_follow").value,viewingAt:$("l_viewing").value,notes:$("l_notes").value.trim()};
+    const data={name:$("l_name").value.trim(),phone:$("l_phone").value.trim(),source:$("l_source").value,status:$("l_status").value,owner:$("l_owner").value,nextFollowUp:$("l_follow").value,viewingAt:$("l_viewing").value,link:$("l_link").value.trim(),notes:$("l_notes").value.trim()};
     const ed=editing;$("dlgLead").close();
     if(ed) await write(()=>db.doc("leads/"+ed.id).update(data),"נשמר");
     else await write(()=>db.collection("leads").add({...data,createdAt:new Date().toISOString(),lastContact:"",log:[]}),"הפנייה נוספה");
@@ -450,12 +524,13 @@ document.addEventListener("submit",async e=>{
     else await write(()=>db.collection("channels").add({...data,active:true,count:0,createdAt:new Date().toISOString()}),"הפרסום נוסף");
   }
   if(f.id==="fPost"&&editing){
-    const c=editing;$("dlgPost").close();
-    await write(()=>db.doc("channels/"+c.id).update({lastPosted:today(),lastPostedBy:S.me,count:(Number(c.count)||0)+1}),"סומן כפורסם. התזכורת הבאה "+fmtDate(addDays(today(),Number(c.intervalDays)||1)));
+    const c=editing;if(!round.length)$("dlgPost").close();
+    await write(()=>db.doc("channels/"+c.id).update({lastPosted:today(),lastPostedBy:S.me,count:(Number(c.count)||0)+1}),"סומן כבוצע. התזכורת הבאה "+fmtDate(addDays(today(),Number(c.intervalDays)||1)));
+    if(roundTotal)nextInRound();
   }
   if(f.id==="fSettings"){
     const g=id=>$(id).value.trim();
-    const cfg={...S.config,apartment:{title:g("s_title"),address:g("s_address"),rooms:g("s_rooms"),sqm:g("s_sqm"),floor:g("s_floor"),price:g("s_price"),yad2Url:g("s_yad2"),perks:g("s_perks")},adText:g("s_ad"),storyText:g("s_story"),replyText:g("s_reply"),people:{a:{name:g("s_an")||"עידו",email:g("s_ae")},b:{name:g("s_bn")||"גלית",email:g("s_be")}}};
+    const cfg={...S.config,apartment:{title:g("s_title"),address:g("s_address"),rooms:g("s_rooms"),sqm:g("s_sqm"),floor:g("s_floor"),price:g("s_price"),yad2Url:g("s_yad2"),perks:g("s_perks")},adText:g("s_ad"),adText2:g("s_ad2"),adText3:g("s_ad3"),storyText:g("s_story"),replyText:g("s_reply"),people:{a:{name:g("s_an")||"עידו",email:g("s_ae"),messenger:g("s_am")},b:{name:g("s_bn")||"גלית",email:g("s_be"),messenger:g("s_bm")}}};
     if(document.activeElement)document.activeElement.blur();
     await write(()=>db.doc("config/main").set(cfg),"ההגדרות נשמרו");
   }
@@ -468,7 +543,7 @@ const DEFAULT_CHANNELS=[
   ["fbprofile-b",{name:"הפרופיל של גלית",platform:"fbprofile",url:"https://www.facebook.com/me",intervalDays:3,owner:"b"}],
   ["igstory",{name:"סטורי באינסטגרם",platform:"igstory",url:"https://www.instagram.com/",intervalDays:2,owner:""}],
   ["igpost",{name:"פוסט באינסטגרם",platform:"igpost",url:"https://www.instagram.com/",intervalDays:7,owner:""}]];
-let subscribed=false, seeded=false, autoMe=false, auth=null, userEmail="";
+let seeding2=false, subscribed=false, seeded=false, autoMe=false, auth=null, userEmail="";
 function gate(show,msg,denied){ $("gate").hidden=!show; if(msg)$("gateMsg").textContent=msg; $("gateIn").hidden=!!denied; $("gateOut").hidden=!denied }
 async function seed(){
   if(seeded)return; seeded=true;
@@ -490,6 +565,12 @@ function subscribe(){
   db.doc("config/main").onSnapshot(s=>{
     if(!s.exists&&!s.metadata.fromCache) seed();
     S.config=s.exists?JSON.parse(JSON.stringify(s.data())):{};
+    if(s.exists&&!s.metadata.fromCache&&!S.config.seed2&&!seeding2){seeding2=true;(async()=>{try{
+      const b=db.batch(),now=new Date().toISOString(),base={lastPosted:"",text:"",notes:"",active:true,count:0,createdAt:now,owner:""};
+      [["fbgroup-1","קבוצת פייסבוק 1","https://www.facebook.com/share/g/1KmteKdvaF/"],["fbgroup-2","קבוצת פייסבוק 2","https://www.facebook.com/share/g/1CJBDQPcW9/"],["fbgroup-3","קבוצת פייסבוק 3","https://www.facebook.com/share/g/1FFQhmgGAx/"]]
+        .forEach(([id,name,url])=>b.set(db.doc("channels/"+id),{...base,name,platform:"fbgroup",url,intervalDays:2}));
+      b.set(db.doc("channels/msgcheck"),{...base,name:"בקשות הודעה במסנג'ר ובאינסטגרם",platform:"msgcheck",url:"https://www.facebook.com/messages/",intervalDays:1});
+      b.update(db.doc("config/main"),{seed2:true});await b.commit()}catch(e){seeding2=false}})()}
     if(!autoMe&&s.exists){autoMe=true;let saved=null;try{saved=localStorage.getItem("me")}catch(e){}
       if(saved===null){const p=S.config.people||{};for(const k of ["a","b"]) if(p[k]&&p[k].email&&p[k].email.toLowerCase()===userEmail.toLowerCase()) S.me=k}}
     ok(s);render();publishFeed()},fail);
