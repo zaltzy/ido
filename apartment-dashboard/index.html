@@ -1,0 +1,447 @@
+<title>מוכרים את הדירה</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Secular+One&display=swap">
+<style>
+/* Layout: one narrow working column, sticky header with tabs, task-first "today" view; state shown as pills. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --sunken:#e9edf1; --line:#d5dce3;
+  --fg:#16212b; --muted:#5b6b7a;
+  --accent:#0d6e6e; --accent-fg:#ffffff; --accent-soft:#d9eeec;
+  --bad:#b3261e; --bad-soft:#fbe4e1; --warn:#8a5a00; --warn-soft:#fbeccb; --ok:#1c6b3a; --ok-soft:#dcf1e3;
+  --yad2:#e8590c; --fb:#1f6feb; --ig:#c2257a;
+  --display:"Secular One","Assistant",system-ui,sans-serif;
+  --body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#10161c; --surface:#19222b; --sunken:#0c1116; --line:#2c3944;
+  --fg:#e8eef3; --muted:#93a4b3;
+  --accent:#4cc2bd; --accent-fg:#06211f; --accent-soft:#143635;
+  --bad:#ff8a80; --bad-soft:#3d1a18; --warn:#f2c14e; --warn-soft:#3a2d0c; --ok:#7ad69a; --ok-soft:#12301e;
+  --yad2:#ff8a4c; --fb:#6ea8ff; --ig:#f06bb0; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#10161c; --surface:#19222b; --sunken:#0c1116; --line:#2c3944;
+  --fg:#e8eef3; --muted:#93a4b3;
+  --accent:#4cc2bd; --accent-fg:#06211f; --accent-soft:#143635;
+  --bad:#ff8a80; --bad-soft:#3d1a18; --warn:#f2c14e; --warn-soft:#3a2d0c; --ok:#7ad69a; --ok-soft:#12301e;
+  --yad2:#ff8a4c; --fb:#6ea8ff; --ig:#f06bb0; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:820px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;flex-direction:column;gap:10px;padding-block:12px 0}
+.headrow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:400;font-size:1.45rem;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:.9rem}
+.seg{display:inline-flex;background:var(--sunken);border-radius:999px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;padding:5px 14px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+nav.tabs{display:flex;gap:4px;overflow-x:auto}
+nav.tabs button{border:0;background:transparent;padding:9px 14px;cursor:pointer;color:var(--muted);font-weight:600;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+nav.tabs .n{display:inline-block;min-width:1.4em;padding:0 5px;margin-inline-start:6px;border-radius:999px;background:var(--bad-soft);color:var(--bad);font-size:.8rem;text-align:center}
+
+main.wrap{padding-block:18px 60px;display:flex;flex-direction:column;gap:18px}
+.banner{background:var(--warn-soft);color:var(--warn);padding:10px 14px;border-radius:var(--r);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.stat b{font-family:var(--display);font-weight:400;font-size:1.8rem;display:block;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:.88rem}
+.stat.hot b{color:var(--bad)}
+
+h2{font-size:1rem;margin:0;color:var(--muted);font-weight:700}
+.sechead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:flex;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+.row:first-child{border-top:0}
+.row .main{flex:1 1 220px;min-width:0}
+.row .ttl{font-weight:700;overflow-wrap:anywhere}
+.row .meta{color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
+.row .acts{display:flex;gap:6px;flex-wrap:wrap}
+.empty{padding:22px 14px;color:var(--muted);text-align:center}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--muted)}
+.dot.yad2{background:var(--yad2)} .dot.fbgroup,.dot.fbprofile{background:var(--fb)} .dot.igstory,.dot.igpost{background:var(--ig)}
+.pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:.82rem;font-weight:700;background:var(--sunken);color:var(--muted);white-space:nowrap}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.acc{background:var(--accent-soft);color:var(--accent)}
+.who{font-size:.82rem;font-weight:700;color:var(--accent)}
+
+.btn{border:1px solid var(--line);background:var(--surface);padding:6px 12px;border-radius:8px;cursor:pointer;font-weight:600;text-decoration:none;color:var(--fg);display:inline-block;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:3px 9px;font-size:.88rem}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 12px;cursor:pointer;font-weight:600;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.phone{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums;user-select:all}
+.note{white-space:pre-wrap;color:var(--fg);font-size:.92rem;margin-top:4px;overflow-wrap:anywhere}
+
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--fg);padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog form{display:flex;flex-direction:column;gap:12px;padding:18px}
+dialog h3{margin:0;font-family:var(--display);font-weight:400;font-size:1.2rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:.88rem;color:var(--muted);font-weight:600;min-width:0}
+label.f input,label.f select,label.f textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;color:var(--fg);font-weight:400;font-size:1rem;width:100%}
+textarea{resize:vertical;min-height:90px}
+.dlgacts{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.dlgacts>div{display:flex;gap:8px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.hint{color:var(--muted);font-size:.9rem}
+#toast{position:fixed;inset-inline:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));margin:auto;width:fit-content;max-width:90vw;background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:999px;font-weight:600;z-index:20}
+</style>
+
+<div dir="rtl" lang="he">
+<header class="top"><div class="wrap">
+  <div class="headrow">
+    <div><h1 id="title">מוכרים את הדירה</h1><div class="sub" id="subtitle">טוען נתונים…</div></div>
+    <div class="seg" role="group" aria-label="מי צופה" id="meSeg"></div>
+  </div>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+</div></header>
+
+<main class="wrap" id="app"></main>
+
+<dialog id="dlgLead"><form id="fLead">
+  <h3 id="leadTitle">פנייה חדשה</h3>
+  <div class="grid2">
+    <label class="f">שם<input id="l_name" required autocomplete="off"></label>
+    <label class="f">טלפון<input id="l_phone" inputmode="tel" dir="ltr" autocomplete="off"></label>
+    <label class="f">הגיע דרך<select id="l_source"></select></label>
+    <label class="f">סטטוס<select id="l_status"></select></label>
+    <label class="f">באחריות<select id="l_owner"></select></label>
+    <label class="f">לחזור אליו בתאריך<input id="l_follow" type="date"></label>
+    <label class="f">ביקור בדירה<input id="l_viewing" type="datetime-local"></label>
+  </div>
+  <label class="f">הערות (תקציב, מה חשוב להם, מה נאמר)<textarea id="l_notes"></textarea></label>
+  <div class="dlgacts"><div><button type="button" class="btn danger" id="l_del">מחק</button></div>
+  <div><button type="button" class="btn" data-close>ביטול</button><button class="btn pri">שמור</button></div></div>
+</form></dialog>
+
+<dialog id="dlgTalk"><form id="fTalk">
+  <h3 id="talkTitle">עדכון אחרי שיחה</h3>
+  <label class="f">מה נאמר<textarea id="t_text" placeholder="למשל: מעוניינים, רוצים לבוא ביום שלישי בערב"></textarea></label>
+  <div class="grid2">
+    <label class="f">סטטוס<select id="t_status"></select></label>
+    <label class="f">לחזור אליו בתאריך<input id="t_follow" type="date"></label>
+    <label class="f">ביקור בדירה<input id="t_viewing" type="datetime-local"></label>
+  </div>
+  <div class="dlgacts"><div></div><div><button type="button" class="btn" data-close>ביטול</button><button class="btn pri">שמור</button></div></div>
+</form></dialog>
+
+<dialog id="dlgChan"><form id="fChan">
+  <h3 id="chanTitle">פרסום חדש</h3>
+  <div class="grid2">
+    <label class="f">שם (למשל שם הקבוצה)<input id="c_name" required autocomplete="off"></label>
+    <label class="f">סוג<select id="c_platform"></select></label>
+    <label class="f">קישור<input id="c_url" type="url" dir="ltr" placeholder="https://"></label>
+    <label class="f">לפרסם מחדש כל כמה ימים<input id="c_interval" type="number" min="1" max="60" required></label>
+    <label class="f">באחריות<select id="c_owner"></select></label>
+    <label class="f">פורסם לאחרונה<input id="c_last" type="date"></label>
+  </div>
+  <label class="f">טקסט ייעודי לפרסום הזה (ריק = טקסט המודעה הכללי)<textarea id="c_text"></textarea></label>
+  <label class="f">הערות (כללי הקבוצה, ימים מותרים)<input id="c_notes" autocomplete="off"></label>
+  <div class="dlgacts"><div><button type="button" class="btn danger" id="c_del">מחק</button></div>
+  <div><button type="button" class="btn" data-close>ביטול</button><button class="btn pri">שמור</button></div></div>
+</form></dialog>
+
+<dialog id="dlgPost"><form id="fPost">
+  <h3 id="postTitle">פרסום מחדש</h3>
+  <div class="hint" id="postHint"></div>
+  <label class="f">הטקסט לפרסום (אפשר לשנות לפני ההעתקה)<textarea id="p_text" style="min-height:180px"></textarea></label>
+  <div class="chips"><button type="button" class="btn" id="p_copy">העתק טקסט</button><a class="btn" id="p_open" target="_blank" rel="noopener">פתח את המקום לפרסום</a></div>
+  <div class="dlgacts"><div></div><div><button type="button" class="btn" data-close>עוד לא</button><button class="btn pri">פרסמתי, סמן כבוצע</button></div></div>
+</form></dialog>
+
+<div id="toast" hidden></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+document.documentElement.dir="rtl"; document.documentElement.lang="he";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const PLATFORMS={yad2:{label:"יד2",days:1,verb:"להקפיץ"},fbgroup:{label:"קבוצת פייסבוק",days:2,verb:"לפרסם"},fbprofile:{label:"פרופיל פייסבוק",days:3,verb:"לפרסם"},igstory:{label:"סטורי באינסטגרם",days:2,verb:"להעלות"},igpost:{label:"פוסט באינסטגרם",days:7,verb:"להעלות"}};
+const SOURCES={phone:"טלפון",whatsapp:"וואטסאפ",yad2:"יד2",messenger:"מסנג'ר",instagram:"אינסטגרם",other:"אחר"};
+const STATUSES={new:"חדשה",contacted:"בקשר",viewing:"נקבע ביקור",visited:"ביקרו בדירה",nego:"משא ומתן",closed:"לא רלוונטי"};
+const STATUS_PILL={new:"bad",contacted:"",viewing:"acc",visited:"acc",nego:"ok",closed:""};
+
+const S={ready:false,error:"",stale:false,config:{},channels:[],leads:[],tab:"today",me:"",leadFilter:"open",canWrite:true};
+try{S.me=localStorage.getItem("me")||"";S.tab=localStorage.getItem("tab")||"today"}catch(e){}
+let db=null;
+
+/* ---------- dates ---------- */
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const today=()=>ymd(new Date());
+const parseYmd=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const addDays=(s,n)=>{const d=parseYmd(s);d.setDate(d.getDate()+n);return ymd(d)};
+const diffDays=(a,b)=>Math.round((parseYmd(a)-parseYmd(b))/864e5);
+const fmtDate=s=>{if(!s)return"";const d=parseYmd(s.slice(0,10));return d.toLocaleDateString("he-IL",{weekday:"short",day:"numeric",month:"numeric"})};
+const fmtDT=s=>{if(!s)return"";const d=new Date(s);return d.toLocaleDateString("he-IL",{weekday:"short",day:"numeric",month:"numeric"})+" "+pad(d.getHours())+":"+pad(d.getMinutes())};
+function channelDue(c){ if(!c.lastPosted) return today(); return addDays(c.lastPosted, Number(c.intervalDays)||1) }
+function dueLabel(due){const n=diffDays(due,today()); if(n<0) return {t:n===-1?"באיחור של יום":"באיחור של "+(-n)+" ימים",k:"bad"}; if(n===0) return {t:"היום",k:"warn"}; if(n===1) return {t:"מחר",k:""}; return {t:"בעוד "+n+" ימים",k:""}}
+
+/* ---------- people ---------- */
+const person=k=>((S.config.people||{})[k]||{}).name||(k==="a"?"עידו":"גלית");
+const whoLabel=o=>o?person(o):"שנינו";
+const mine=o=>!S.me||!o||o===S.me;
+
+/* ---------- derived ---------- */
+function derive(){
+  const t=today();
+  const posts=S.channels.filter(c=>c.active!==false&&channelDue(c)<=t).sort((a,b)=>channelDue(a)<channelDue(b)?-1:1);
+  const open=S.leads.filter(l=>l.status!=="closed");
+  const fresh=open.filter(l=>l.status==="new"&&!l.lastContact);
+  const follow=open.filter(l=>l.nextFollowUp&&l.nextFollowUp<=t&&!fresh.includes(l));
+  const now=Date.now();
+  const viewings=open.filter(l=>l.viewingAt&&new Date(l.viewingAt).getTime()>now-3*36e5&&l.viewingAt.slice(0,10)<=addDays(t,7)).sort((a,b)=>a.viewingAt<b.viewingAt?-1:1);
+  return {posts,fresh,follow,viewings,open};
+}
+
+/* ---------- render ---------- */
+function render(){
+  const ap=S.config.apartment||{};
+  $("title").textContent=ap.title||"מוכרים את הדירה";
+  const bits=[ap.address,ap.rooms&&ap.rooms+" חדרים",ap.sqm&&ap.sqm+" מ\"ר",ap.price&&"₪"+Number(String(ap.price).replace(/[^\d]/g,"")).toLocaleString("he-IL")].filter(Boolean);
+  $("subtitle").textContent=S.ready?(bits.join(" · ")||"מלאו את פרטי הדירה בלשונית הגדרות"):"טוען נתונים…";
+  $("meSeg").innerHTML=[["","שנינו"],["a",person("a")],["b",person("b")]].map(([k,l])=>`<button type="button" data-me="${k}" aria-pressed="${S.me===k}">${esc(l)}</button>`).join("");
+  const d=derive();
+  const nToday=d.posts.filter(c=>mine(c.owner)).length+d.fresh.filter(l=>mine(l.owner)).length+d.follow.filter(l=>mine(l.owner)).length;
+  $("tabs").innerHTML=[["today","היום",nToday],["posts","פרסומים",0],["leads","פניות",0],["settings","הגדרות",0]].map(([k,l,n])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${l}${n?`<span class="n">${n}</span>`:""}</button>`).join("");
+  if(S.tab==="settings"&&$("app").contains(document.activeElement)&&$("fSettings")) return;
+  let h="";
+  if(S.error) h+=`<div class="banner">${esc(S.error)}</div>`;
+  else if(S.stale) h+=`<div class="banner">הנתונים עדיין לא נטענו מהשרת. ייתכן שהמוצג לא מעודכן.</div>`;
+  if(!S.canWrite) h+=`<div class="banner">אין לך הרשאת עריכה, אפשר רק לצפות. בקשו מבעל הדשבורד לשתף אתכם כעורכים.</div>`;
+  h+=({today:vToday,posts:vPosts,leads:vLeads,settings:vSettings}[S.tab]||vToday)(d);
+  $("app").innerHTML=h;
+}
+
+function postRow(c){
+  const due=channelDue(c),dl=dueLabel(due),p=PLATFORMS[c.platform]||PLATFORMS.fbgroup;
+  return `<div class="row"><span class="dot ${esc(c.platform)}"></span><div class="main"><div class="ttl">${esc(c.name)} <span class="pill ${dl.k}">${dl.t}</span></div>
+  <div class="meta">${esc(p.label)} · כל ${Number(c.intervalDays)===1?"יום":esc(c.intervalDays)+" ימים"} · ${c.lastPosted?"פורסם "+fmtDate(c.lastPosted):"עוד לא פורסם"}${c.count?" · "+c.count+" פעמים":""} · <span class="who">${esc(whoLabel(c.owner))}</span>${c.notes?"<br>"+esc(c.notes):""}</div></div>
+  <div class="acts"><button class="btn pri sm" data-post="${esc(c.id)}">${p.verb} עכשיו</button><button class="btn sm" data-editchan="${esc(c.id)}">ערוך</button></div></div>`;
+}
+function leadRow(l,compact){
+  const st=l.status||"new";
+  const wa=l.phone?waLink(l.phone):"";
+  let extra=[];
+  if(l.viewingAt) extra.push("ביקור: "+fmtDT(l.viewingAt));
+  if(l.nextFollowUp&&st!=="closed"){const dl=dueLabel(l.nextFollowUp);extra.push(`לחזור: ${fmtDate(l.nextFollowUp)} <span class="pill ${dl.k}">${dl.t}</span>`)}
+  if(!l.lastContact&&st==="new") extra.push(`<span class="pill bad">ממתין למענה ${waitText(l.createdAt)}</span>`);
+  else if(l.lastContact) extra.push("קשר אחרון: "+fmtDate(l.lastContact.slice(0,10)));
+  return `<div class="row"><div class="main"><div class="ttl">${esc(l.name||"ללא שם")} <span class="pill ${STATUS_PILL[st]||""}">${STATUSES[st]||st}</span></div>
+  <div class="meta">${l.phone?`<span class="phone">${esc(l.phone)}</span> · `:""}${esc(SOURCES[l.source]||"")} · <span class="who">${esc(whoLabel(l.owner))}</span>${extra.length?"<br>"+extra.join(" · "):""}</div>
+  ${!compact&&l.notes?`<div class="note">${esc(l.notes)}</div>`:""}</div>
+  <div class="acts">${wa?`<a class="btn sm" href="${wa}" target="_blank" rel="noopener">וואטסאפ</a>`:""}${l.phone?`<button class="btn sm" data-copy="${esc(l.phone)}">העתק מספר</button>`:""}<button class="btn pri sm" data-talk="${esc(l.id)}">דיברנו</button><button class="btn sm" data-editlead="${esc(l.id)}">ערוך</button></div></div>`;
+}
+function waitText(iso){if(!iso)return"";const h=Math.floor((Date.now()-new Date(iso).getTime())/36e5);if(h<1)return"פחות משעה";if(h<24)return h+" שעות";const d=Math.floor(h/24);return d===1?"יום":d+" ימים"}
+function waLink(p){let n=String(p).replace(/[^\d]/g,"");if(n.startsWith("0"))n="972"+n.slice(1);if(n.length<9)return"";const msg=(S.config.replyText||"").trim();return "https://wa.me/"+n+(msg?"?text="+encodeURIComponent(msg):"")}
+
+function vToday(d){
+  const posts=d.posts.filter(c=>mine(c.owner)),fresh=d.fresh.filter(l=>mine(l.owner)),follow=d.follow.filter(l=>mine(l.owner)),view=d.viewings.filter(l=>mine(l.owner));
+  let h=`<div class="stats">
+    <div class="stat ${posts.length?"hot":""}"><b>${posts.length}</b><span>פרסומים לחדש</span></div>
+    <div class="stat ${fresh.length?"hot":""}"><b>${fresh.length}</b><span>פניות בלי מענה</span></div>
+    <div class="stat ${follow.length?"hot":""}"><b>${follow.length}</b><span>לחזור אליהם</span></div>
+    <div class="stat"><b>${view.length}</b><span>ביקורים השבוע</span></div></div>`;
+  if(!S.ready) return h+`<div class="list"><div class="empty">טוען…</div></div>`;
+  h+=`<div class="sechead"><h2>פניות שמחכות למענה</h2><button class="btn pri sm" data-newlead>פנייה חדשה</button></div><div class="list">${fresh.length?fresh.map(l=>leadRow(l,true)).join(""):`<div class="empty">אין פניות פתוחות בלי מענה. כשמישהו מתקשר או כותב, הוסיפו אותו כאן מיד.</div>`}</div>`;
+  h+=`<div class="sechead"><h2>לפרסם מחדש היום</h2></div><div class="list">${posts.length?posts.map(postRow).join(""):`<div class="empty">${S.channels.length?"כל הפרסומים מעודכנים.":"עוד לא הוגדרו פרסומים. הוסיפו את המודעה ביד2 ואת קבוצות הפייסבוק בלשונית פרסומים."}</div>`}</div>`;
+  h+=`<div class="sechead"><h2>לחזור למתעניינים</h2></div><div class="list">${follow.length?follow.map(l=>leadRow(l,true)).join(""):`<div class="empty">אין מעקבים להיום.</div>`}</div>`;
+  h+=`<div class="sechead"><h2>ביקורים קרובים</h2></div><div class="list">${view.length?view.map(l=>leadRow(l,true)).join(""):`<div class="empty">אין ביקורים מתוכננים בשבוע הקרוב.</div>`}</div>`;
+  return h;
+}
+function vPosts(){
+  const list=S.channels.slice().sort((a,b)=>channelDue(a)<channelDue(b)?-1:1);
+  const act=list.filter(c=>c.active!==false),off=list.filter(c=>c.active===false);
+  let h=`<div class="sechead"><h2>כל המקומות שבהם הדירה מפורסמת</h2><button class="btn pri sm" data-newchan>הוסף פרסום</button></div>
+  <div class="list">${act.length?act.map(postRow).join(""):`<div class="empty">הוסיפו כל מקום פרסום בנפרד: המודעה ביד2, כל קבוצת פייסבוק, הפרופיל האישי, סטורי ופוסט באינסטגרם. לכל אחד יש קצב חידוש משלו.</div>`}</div>`;
+  if(off.length) h+=`<div class="sechead"><h2>מושהים</h2></div><div class="list">${off.map(postRow).join("")}</div>`;
+  h+=`<div class="hint">לחיצה על "לפרסם עכשיו" פותחת את הטקסט להעתקה ואת הקישור. אחרי שפרסמתם סמנו כבוצע, והתזכורת הבאה תחושב מחדש.</div>`;
+  return h;
+}
+function vLeads(d){
+  const counts={};S.leads.forEach(l=>{counts[l.status||"new"]=(counts[l.status||"new"]||0)+1});
+  const f=S.leadFilter;
+  let list=S.leads.filter(l=>mine(l.owner)).filter(l=>f==="all"?true:f==="open"?l.status!=="closed":(l.status||"new")===f);
+  list.sort((a,b)=>(b.createdAt||"")<(a.createdAt||"")?-1:1);
+  const chip=(k,l,n)=>`<button type="button" class="chip" data-lf="${k}" aria-pressed="${f===k}">${l}${n!=null?" "+n:""}</button>`;
+  return `<div class="sechead"><h2>${S.leads.length} פניות בסך הכול</h2><button class="btn pri sm" data-newlead>פנייה חדשה</button></div>
+  <div class="chips">${chip("open","פעילות",d.open.length)}${Object.keys(STATUSES).map(k=>chip(k,STATUSES[k],counts[k]||0)).join("")}${chip("all","הכול",S.leads.length)}</div>
+  <div class="list">${list.length?list.map(l=>leadRow(l,false)).join(""):`<div class="empty">אין פניות בתצוגה הזאת.</div>`}</div>`;
+}
+function vSettings(){
+  const ap=S.config.apartment||{},pe=S.config.people||{},a=pe.a||{},b=pe.b||{};
+  const v=x=>esc(x??"");
+  return `<form id="fSettings" class="card">
+  <h2>פרטי הדירה</h2>
+  <div class="grid2">
+    <label class="f">כותרת<input id="s_title" value="${v(ap.title)}" placeholder="4 חדרים ברחוב…"></label>
+    <label class="f">כתובת<input id="s_address" value="${v(ap.address)}"></label>
+    <label class="f">חדרים<input id="s_rooms" value="${v(ap.rooms)}" inputmode="decimal"></label>
+    <label class="f">מ"ר<input id="s_sqm" value="${v(ap.sqm)}" inputmode="numeric"></label>
+    <label class="f">קומה<input id="s_floor" value="${v(ap.floor)}"></label>
+    <label class="f">מחיר מבוקש (₪)<input id="s_price" value="${v(ap.price)}" inputmode="numeric"></label>
+    <label class="f">קישור למודעה ביד2<input id="s_yad2" type="url" dir="ltr" value="${v(ap.yad2Url)}"></label>
+    <label class="f">יתרונות בולטים<input id="s_perks" value="${v(ap.perks)}" placeholder="מעלית, חניה, ממ&quot;ד, מרפסת שמש"></label>
+  </div>
+  <h2>טקסטים</h2>
+  <label class="f">טקסט המודעה (לפייסבוק ולפוסטים)<textarea id="s_ad" style="min-height:170px">${v(S.config.adText)}</textarea></label>
+  <div><button type="button" class="btn sm" id="s_gen">נסח טיוטה מפרטי הדירה</button></div>
+  <label class="f">טקסט קצר לסטורי<textarea id="s_story">${v(S.config.storyText)}</textarea></label>
+  <label class="f">הודעת מענה ראשונה בוואטסאפ<textarea id="s_reply">${v(S.config.replyText)}</textarea></label>
+  <h2>מי מקבל תזכורות במייל</h2>
+  <div class="grid2">
+    <label class="f">שם<input id="s_an" value="${v(a.name||"עידו")}"></label>
+    <label class="f">מייל<input id="s_ae" type="email" dir="ltr" value="${v(a.email)}"></label>
+    <label class="f">שם<input id="s_bn" value="${v(b.name||"גלית")}"></label>
+    <label class="f">מייל<input id="s_be" type="email" dir="ltr" value="${v(b.email)}"></label>
+  </div>
+  <div class="hint">מיילי התזכורת נשלחים בבוקר (07:00) ובערב (21:30), לא בשבת, לכתובות שרשומות כאן.</div>
+  <div><button class="btn pri">שמור הגדרות</button></div></form>`;
+}
+
+/* ---------- actions ---------- */
+function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2400)}
+async function write(fn,okMsg){
+  if(!db){toast("אין חיבור לנתונים");return false}
+  try{await fn();if(okMsg)toast(okMsg);return true}
+  catch(e){ if(e&&e.code==="invalid_argument"){S.canWrite=false;render();toast("אין הרשאת עריכה")} else toast("השמירה נכשלה, נסו שוב"); return false }
+}
+async function copyText(t,el){try{await navigator.clipboard.writeText(t);toast("הועתק")}catch(e){if(el&&el.select){el.focus();el.select();toast("סמנו והעתיקו ידנית")}else toast("לא ניתן להעתיק, סמנו את הטקסט ידנית")}}
+const opts=(o,sel)=>Object.keys(o).map(k=>`<option value="${k}"${k===sel?" selected":""}>${esc(typeof o[k]==="string"?o[k]:o[k].label)}</option>`).join("");
+const ownerOpts=sel=>[["","שנינו"],["a",person("a")],["b",person("b")]].map(([k,l])=>`<option value="${k}"${k===(sel||"")?" selected":""}>${esc(l)}</option>`).join("");
+let editing=null, armed=null;
+function arm(btn){ if(armed===btn){armed=null;return true} armed=btn;btn.textContent="ללחוץ שוב למחיקה";setTimeout(()=>{if(armed===btn){armed=null;btn.textContent="מחק"}},3000);return false }
+
+function openLead(id){
+  const l=id?S.leads.find(x=>x.id===id):null; editing=l;
+  $("leadTitle").textContent=l?"עריכת פנייה":"פנייה חדשה";
+  $("l_name").value=l?.name||"";$("l_phone").value=l?.phone||"";
+  $("l_source").innerHTML=opts(SOURCES,l?.source||"phone");$("l_status").innerHTML=opts(STATUSES,l?.status||"new");
+  $("l_owner").innerHTML=ownerOpts(l?l.owner:S.me);$("l_follow").value=l?.nextFollowUp||"";$("l_viewing").value=l?.viewingAt||"";$("l_notes").value=l?.notes||"";
+  $("l_del").hidden=!l;$("l_del").textContent="מחק";$("dlgLead").showModal();
+}
+function openTalk(id){
+  const l=S.leads.find(x=>x.id===id);if(!l)return;editing=l;
+  $("talkTitle").textContent="עדכון אחרי שיחה עם "+(l.name||"");
+  $("t_text").value="";$("t_status").innerHTML=opts(STATUSES,l.status==="new"||!l.status?"contacted":l.status);
+  $("t_follow").value=addDays(today(),2);$("t_viewing").value=l.viewingAt||"";$("dlgTalk").showModal();
+}
+function openChan(id){
+  const c=id?S.channels.find(x=>x.id===id):null; editing=c;
+  $("chanTitle").textContent=c?"עריכת פרסום":"פרסום חדש";
+  $("c_name").value=c?.name||"";$("c_platform").innerHTML=opts(PLATFORMS,c?.platform||"fbgroup");$("c_url").value=c?.url||"";
+  $("c_interval").value=c?.intervalDays||PLATFORMS[c?.platform||"fbgroup"].days;$("c_owner").innerHTML=ownerOpts(c?c.owner:S.me);
+  $("c_last").value=c?.lastPosted||"";$("c_text").value=c?.text||"";$("c_notes").value=c?.notes||"";
+  $("c_del").hidden=!c;$("c_del").textContent="מחק";$("dlgChan").showModal();
+}
+function openPost(id){
+  const c=S.channels.find(x=>x.id===id);if(!c)return;editing=c;
+  const p=PLATFORMS[c.platform]||PLATFORMS.fbgroup;
+  $("postTitle").textContent=p.verb+": "+c.name;
+  let text=c.text||(c.platform==="igstory"?(S.config.storyText||S.config.adText):S.config.adText)||"";
+  $("postHint").textContent=c.platform==="yad2"?"היכנסו לאזור האישי ביד2 ולחצו על הקפצת המודעה. אחר כך סמנו כאן כבוצע.":(text?"העתיקו את הטקסט, פתחו את הקישור, הדביקו וצרפו תמונות.":"עוד לא נכתב טקסט מודעה. אפשר לכתוב אותו בלשונית הגדרות.")+(c.notes?" הערה: "+c.notes:"");
+  $("p_text").value=text;$("p_text").parentElement.hidden=c.platform==="yad2";$("p_copy").hidden=c.platform==="yad2";
+  const url=c.url||(c.platform==="yad2"?(S.config.apartment||{}).yad2Url:"");
+  const a=$("p_open");a.hidden=!/^https?:\/\//i.test(url||"");if(!a.hidden)a.href=url;
+  $("dlgPost").showModal();
+}
+function genAd(){
+  const g=id=>$(id).value.trim();
+  const lines=["למכירה"+(g("s_rooms")?": דירת "+g("s_rooms")+" חדרים":"")+(g("s_address")?" ב"+g("s_address"):"")];
+  const facts=[g("s_sqm")&&g("s_sqm")+" מ\"ר",g("s_floor")&&"קומה "+g("s_floor")].filter(Boolean);
+  if(facts.length)lines.push(facts.join(" · "));
+  if(g("s_perks"))lines.push(g("s_perks"));
+  if(g("s_price"))lines.push("מחיר מבוקש: "+Number(g("s_price").replace(/[^\d]/g,"")).toLocaleString("he-IL")+" ₪");
+  lines.push("ללא תיווך. לפרטים ולתיאום ביקור שלחו הודעה.");
+  if(g("s_yad2"))lines.push("תמונות ופרטים נוספים: "+g("s_yad2"));
+  return lines.join("\n");
+}
+
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button,a");if(!t)return;
+  const ds=t.dataset;
+  if("close" in ds){t.closest("dialog").close();return}
+  if("me" in ds){S.me=ds.me;try{localStorage.setItem("me",S.me)}catch(e){}render();return}
+  if(ds.tab){S.tab=ds.tab;try{localStorage.setItem("tab",S.tab)}catch(e){}$("app").innerHTML="";render();return}
+  if(ds.lf){S.leadFilter=ds.lf;render();return}
+  if("newlead" in ds)return openLead();
+  if(ds.editlead)return openLead(ds.editlead);
+  if(ds.talk)return openTalk(ds.talk);
+  if("newchan" in ds)return openChan();
+  if(ds.editchan)return openChan(ds.editchan);
+  if(ds.post)return openPost(ds.post);
+  if(ds.copy)return copyText(ds.copy);
+  if(t.id==="p_copy")return copyText($("p_text").value,$("p_text"));
+  if(t.id==="s_gen"){$("s_ad").value=genAd();return}
+  if(t.id==="l_del"&&editing){if(arm(t)){const id=editing.id;$("dlgLead").close();write(()=>db.doc("leads/"+id).delete(),"הפנייה נמחקה")}return}
+  if(t.id==="c_del"&&editing){if(arm(t)){const id=editing.id;$("dlgChan").close();write(()=>db.doc("channels/"+id).delete(),"הפרסום נמחק")}return}
+});
+$("c_platform").addEventListener("change",e=>{if(!editing)$("c_interval").value=PLATFORMS[e.target.value].days});
+
+document.addEventListener("submit",async e=>{
+  e.preventDefault();const f=e.target;
+  if(f.id==="fLead"){
+    const data={name:$("l_name").value.trim(),phone:$("l_phone").value.trim(),source:$("l_source").value,status:$("l_status").value,owner:$("l_owner").value,nextFollowUp:$("l_follow").value,viewingAt:$("l_viewing").value,notes:$("l_notes").value.trim()};
+    const ed=editing;$("dlgLead").close();
+    if(ed) await write(()=>db.doc("leads/"+ed.id).update(data),"נשמר");
+    else await write(()=>db.collection("leads").add({...data,createdAt:new Date().toISOString(),lastContact:"",log:[]}),"הפנייה נוספה");
+  }
+  if(f.id==="fTalk"&&editing){
+    const l=editing,txt=$("t_text").value.trim(),now=new Date().toISOString();
+    const log=(l.log||[]).concat([{t:now,by:S.me,text:txt}]).slice(-40);
+    const stamp=fmtDate(today())+(S.me?" ("+person(S.me)+")":"");
+    const notes=txt?((l.notes?l.notes+"\n":"")+stamp+": "+txt):l.notes||"";
+    $("dlgTalk").close();
+    await write(()=>db.doc("leads/"+l.id).update({status:$("t_status").value,nextFollowUp:$("t_status").value==="closed"?"":$("t_follow").value,viewingAt:$("t_viewing").value,lastContact:now,log,notes}),"עודכן");
+  }
+  if(f.id==="fChan"){
+    const data={name:$("c_name").value.trim(),platform:$("c_platform").value,url:$("c_url").value.trim(),intervalDays:Math.max(1,Number($("c_interval").value)||1),owner:$("c_owner").value,lastPosted:$("c_last").value,text:$("c_text").value.trim(),notes:$("c_notes").value.trim()};
+    const ed=editing;$("dlgChan").close();
+    if(ed) await write(()=>db.doc("channels/"+ed.id).update(data),"נשמר");
+    else await write(()=>db.collection("channels").add({...data,active:true,count:0,createdAt:new Date().toISOString()}),"הפרסום נוסף");
+  }
+  if(f.id==="fPost"&&editing){
+    const c=editing;$("dlgPost").close();
+    await write(()=>db.doc("channels/"+c.id).update({lastPosted:today(),lastPostedBy:S.me,count:(Number(c.count)||0)+1}),"סומן כפורסם. התזכורת הבאה "+fmtDate(addDays(today(),Number(c.intervalDays)||1)));
+  }
+  if(f.id==="fSettings"){
+    const g=id=>$(id).value.trim();
+    const cfg={...S.config,apartment:{title:g("s_title"),address:g("s_address"),rooms:g("s_rooms"),sqm:g("s_sqm"),floor:g("s_floor"),price:g("s_price"),yad2Url:g("s_yad2"),perks:g("s_perks")},adText:g("s_ad"),storyText:g("s_story"),replyText:g("s_reply"),people:{a:{name:g("s_an")||"עידו",email:g("s_ae")},b:{name:g("s_bn")||"גלית",email:g("s_be")}}};
+    if(document.activeElement)document.activeElement.blur();
+    await write(()=>db.doc("config/main").set(cfg),"ההגדרות נשמרו");
+  }
+});
+
+/* ---------- data ---------- */
+function start(){
+  render();
+  if(!window.claude||!window.claude.use){S.error="הדשבורד צריך להיפתח מתוך Claude כדי לטעון ולשמור נתונים.";render();return}
+  window.claude.use("db").then(d=>{
+    if(!d){S.error="לא ניתן להתחבר לנתונים. ודאו שאתם מחוברים לחשבון Claude ושהדשבורד שותף איתכם.";render();return}
+    db=d;let got=0;
+    const timer=setTimeout(()=>{S.stale=true;render()},10000);
+    const ok=snap=>{ if(!snap.metadata||!snap.metadata.fromCache){ if(++got>=3){clearTimeout(timer);S.stale=false} } S.ready=true };
+    const fail=()=>{clearTimeout(timer);S.stale=false;S.ready=true;S.error="החיבור לנתונים נותק. רעננו את העמוד.";render()};
+    db.doc("config/main").onSnapshot(s=>{S.config=s.exists?JSON.parse(JSON.stringify(s.data())):{};ok(s);render()},fail);
+    db.collection("channels").onSnapshot(s=>{S.channels=s.docs.map(x=>({...x.data(),id:x.id}));ok(s);render()},fail);
+    db.collection("leads").onSnapshot(s=>{S.leads=s.docs.map(x=>({...x.data(),id:x.id}));ok(s);render()},fail);
+  });
+  window.claude.use("user").then(async u=>{ if(!u)return; try{const c=await u.can("data.write"); if(c===false){S.canWrite=false;render()}}catch(e){} });
+}
+start();
+})();
+</script>
